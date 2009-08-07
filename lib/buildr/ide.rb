@@ -17,3 +17,6 @@
 require 'buildr/ide/eclipse'
 require 'buildr/ide/idea'
 require 'buildr/ide/idea7x'
+
+require 'buildr/java/eclipse'
+require 'buildr/scala/eclipse'

@@ -74,8 +74,6 @@ module Buildr
             @natures = project.parent.eclipse.options.natures
           else
             @natures = []
-            @natures << 'ch.epfl.lamp.sdt.core.scalanature' if project.compile.language == :scala
-            @natures << "org.eclipse.jdt.core.javanature"
           end
         end
         @natures
@@ -103,8 +101,6 @@ module Buildr
             @classpath_containers = project.parent.eclipse.options.classpath_containers
           else
             @classpath_containers = []
-            @classpath_containers << 'ch.epfl.lamp.sdt.launching.SCALA_CONTAINER' if project.compile.language == :scala
-            @classpath_containers << "org.eclipse.jdt.launching.JRE_CONTAINER"
           end
         end
         @classpath_containers
@@ -167,9 +163,6 @@ module Buildr
 
     after_define do |project|
       eclipse = project.task('eclipse')
-
-      # Check if project has scala facet
-      scala = project.compile.language == :scala
 
       # Only for projects that we support
       supported_languages = [:java, :scala]
