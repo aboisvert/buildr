@@ -23,44 +23,22 @@ module Buildr
     include Extension
 
     class Eclipse
-      
+
       attr_reader :options
-       
-      def initialize(project)
-        @options = Options.new(project)
-      end
-    end
-     
-    class Options
-      
-      attr_writer :m2_repo_var
-      
+
       def initialize(project)
         @project = project
+        @options = Options.new(project)
       end
-      
-      # The classpath variable used to point at the local maven2 repository.
-      # Example:
-      #   M2_REPO
-      def m2_repo_var
-        if @m2_repo_var.nil?
-          if project.parent
-            @m2_repo_var = project.parent.eclipse.options.m2_repo_var
-          else
-            @m2_repo_var = 'M2_REPO'
-          end
-        end
-        @m2_repo_var
-      end
-      
+
       # :call-seq:
       #   natures=(natures)
       # Sets the Eclipse project natures on the project.
       #
-      def natures=(var) 
-        @natures = arrayfy(var) 
+      def natures=(var)
+        @natures = arrayfy(var)
       end
-      
+
       # :call-seq:
       #   natures() => [n1, n2]
       # Returns the Eclipse project natures on the project.
@@ -68,89 +46,97 @@ module Buildr
       # on the project.
       #
       # An Eclipse project nature is used internally by Eclipse to determine the aspects of a project.
-      def natures
-        if @natures.nil?
-          if project.parent
-            @natures = project.parent.eclipse.options.natures
-          else
-            @natures = []
-          end
+      def natures(*values)
+        if values.size > 0
+          @natures ||= []
+          @natures += values
+        else
+          @natures || (@project.parent ? @project.parent.eclipse.natures : [])
         end
-        @natures
       end
-      
+
       # :call-seq:
       #   classpath_containers=(cc)
       # Sets the Eclipse project classpath containers on the project.
       #
       def classpath_containers=(var)
-        @classpath_containers = arrayfy(var) 
+        @classpath_containers = arrayfy(var)
       end
-      
+
       # :call-seq:
       #   classpath_containers() => [con1, con2]
       # Returns the Eclipse project classpath containers on the project.
       # They may be derived from the parent project if no specific classpath containers have been set
       # on the project.
-      # 
+      #
       # A classpath container is an Eclipse pre-determined ensemble of dependencies made available to
       # the project classpath.
-      def classpath_containers
-        if @classpath_containers.nil?
-          if project.parent
-            @classpath_containers = project.parent.eclipse.options.classpath_containers
-          else
-            @classpath_containers = []
-          end
+      def classpath_containers(*values)
+        if values.size > 0
+          @classpath_containers ||= []
+          @classpath_containers += values
+        else
+          @classpath_containers || (@project.parent ? @project.parent.eclipse.classpath_containers : [])
         end
-        @classpath_containers
       end
-      
+
       # :call-seq:
       #   builders=(builders)
       # Sets the Eclipse project builders on the project.
       #
       def builders=(var)
-        @builders = arrayfy(var) 
+        @builders = arrayfy(var)
       end
-      
+
       # :call-seq:
       #   builders() => [b1, b2]
       # Returns the Eclipse project builders on the project.
       # They may be derived from the parent project if no specific builders have been set
       # on the project.
-      # 
+      #
       # A builder is an Eclipse background job that parses the source code to produce built artifacts.
-      def builders
-        if @builders.nil?
-          if project.parent
-            @builders = project.parent.eclipse.options.builders
-          else
-            @builders = []
-            if project.compile.language == :scala
-              @builders << 'ch.epfl.lamp.sdt.core.scalabuilder'
-            else 
-              @builders << "org.eclipse.jdt.core.javabuilder"
-            end
-          end
+      def builders(*values)
+        if values.size > 0
+          @builders ||= []
+          @builders += values
+        else
+          @builders || (@project.parent ? @project.parent.eclipse.builders : [])
         end
-        @builders
       end
-        
+
       private
         
-      attr_reader :project
-      
       def arrayfy(obj)
         obj.is_a?(Array) ? obj : [obj]
       end
     end
-    
+
+    class Options
+
+      attr_writer :m2_repo_var
+
+      def initialize(project)
+        @project = project
+      end
+
+      # The classpath variable used to point at the local maven2 repository.
+      # Example:
+      #   eclipse.options.m2_repo_var = 'M2_REPO'
+      def m2_repo_var(*values)
+        fail "m2_repo_var can only accept one value: #{values}" if values.size > 1
+        if values.size > 0
+          @m2_repo_var = values[0]
+        else
+          @m2_repo_var || (@project.parent ? @project.parent.eclipse.options.m2_repo_var : 'M2_REPO')
+        end
+      end
+    end
+
     def eclipse
       @eclipse ||= Eclipse.new(self)
       @eclipse
     end
-    
+
     first_time do
       # Global task "eclipse" generates artifacts for all projects.
       desc 'Generate Eclipse artifacts for all projects'
@@ -164,16 +150,11 @@ module Buildr
     after_define do |project|
       eclipse = project.task('eclipse')
 
-      # Only for projects that we support
-      supported_languages = [:java, :scala]
-      supported_packaging = %w(jar war rar mar aar)
-      if (supported_languages.include?(project.compile.language) ||
-          supported_languages.include?(project.test.compile.language) ||
-          project.packages.detect { |pkg| supported_packaging.include?(pkg.type.to_s) })
-        eclipse.enhance [ file(project.path_to('.classpath')), file(project.path_to('.project')) ]
+      eclipse.enhance [ file(project.path_to('.classpath')), file(project.path_to('.project')) ]
 
-        # The only thing we need to look for is a change in the Buildfile.
-        file(project.path_to('.classpath')=>Buildr.application.buildfile) do |task|
+      # The only thing we need to look for is a change in the Buildfile.
+      file(project.path_to('.classpath')=>Buildr.application.buildfile) do |task|
+        if (project.eclipse.natures.reject { |x| x.is_a?(Symbol) }.size > 0)
           info "Writing #{task.name}"
 
           m2repo = Buildr::Repositories.instance.local
@@ -211,16 +192,18 @@ module Buildr
               classpathentry.output project.compile.target if project.compile.target
               classpathentry.lib libs
               classpathentry.var m2_libs, project.eclipse.options.m2_repo_var, m2repo
-              
-              project.eclipse.options.classpath_containers.each {|container|
+
+              project.eclipse.classpath_containers.each { |container|
                 classpathentry.con container
               }
             end
           end
         end
-
-        # The only thing we need to look for is a change in the Buildfile.
-        file(project.path_to('.project')=>Buildr.application.buildfile) do |task|
+      end
+      
+      # The only thing we need to look for is a change in the Buildfile.
+      file(project.path_to('.project')=>Buildr.application.buildfile) do |task|
+        if (project.eclipse.natures.reject { |x| x.is_a?(Symbol) }.size > 0)
           info "Writing #{task.name}"
           File.open(task.name, 'w') do |file|
             xml = Builder::XmlMarkup.new(:target=>file, :indent=>2)
@@ -228,22 +211,21 @@ module Buildr
               xml.name project.id
               xml.projects
               xml.buildSpec do
-                project.eclipse.options.builders.each {|builder|
+                project.eclipse.builders.each { |builder|
                   xml.buildCommand do
                     xml.name builder
                   end
                 }
               end
               xml.natures do
-                project.eclipse.options.natures.each {|nature|
-                  xml.nature nature
+                project.eclipse.natures.each { |nature|
+                  xml.nature nature unless nature.is_a? Symbol
                 }
               end
             end
           end
         end
       end
-
     end
 
 
@@ -258,11 +240,11 @@ module Buildr
         @excludes = [ '**/.svn/', '**/CVS/' ].join('|')
         @paths_written = []
       end
-      
+
       def write &block
         @xml.classpath &block
       end
-      
+
       def con path
         @xml.classpathentry :kind=>'con', :path=>path
       end
@@ -290,7 +272,7 @@ module Buildr
           @xml.classpathentry :kind=>'src', :combineaccessrules=>'false', :path=>"/#{project_id}"
         end
       end
-      
+
       def output target
         @xml.classpathentry :kind=>'output', :path=>relative(target)
       end
@@ -309,7 +291,7 @@ module Buildr
           @xml.classpathentry :kind=>'var', :path=>relative_lib_path, :sourcepath=>relative_source_path
         end
       end
-              
+
       private
 
       # Find a path relative to the project's root directory.
@@ -338,10 +320,15 @@ module Buildr
     end
 
   end
-  
-end # module Buildr
 
+end # module Buildr
 
 class Buildr::Project
   include Buildr::Eclipse
 end
+
+# Order is significant for auto-detection, from most specific to least
+require 'buildr/ide/eclipse/plugin'
+require 'buildr/ide/eclipse/scala'
+require 'buildr/ide/eclipse/java'
+
