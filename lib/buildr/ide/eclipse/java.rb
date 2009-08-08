@@ -22,20 +22,25 @@ module Buildr
     module Java
       include Extension
       
-      NATURE = 'org.eclipse.jdt.core.javanature'
-      CLASSPATH_CONTAINER = 'org.eclipse.jdt.launching.JRE_CONTAINER'
-      BUILDER = 'org.eclipse.jdt.core.javabuilder'
-      
+      NATURE    = 'org.eclipse.jdt.core.javanature'
+      CONTAINER = 'org.eclipse.jdt.launching.JRE_CONTAINER'
+      BUILDER    = 'org.eclipse.jdt.core.javabuilder'
+
       after_define do |project|
+        eclipse = project.eclipse
+
+        # smart defaults
         if project.compile.language == :java || project.test.compile.language == :java
-          options = project.eclipse.options
-          if options.natures == []
-            options.natures = JAVA_NATURE 
-          end
-          if options.classpath_containers == []
-            options.classpath_containers = CLASSPATH_CONTAINER
-          end
-          options.builders << BUILDER unless options.builders.include? BUILDER 
+          eclipse.natures = NATURE if eclipse.natures.empty?
+          eclipse.classpath_containers = CONTAINER if eclipse.classpath_containers.empty?
+          eclipse.builders = BUILDER if eclipse.builders.empty?
+        end
+        
+        # :java nature explicitly set
+        if eclipse.natures.include? :java
+          eclipse.natures += NATURE unless eclipse.natures.include? NATURE
+          eclipse.classpath_containers += CONTAINER unless eclipse.classpath_containers.include? CONTAINER
+          eclipse.builders += BUILDER unless eclipse.builders.include? BUILDER
         end
       end
       

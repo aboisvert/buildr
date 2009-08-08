@@ -22,21 +22,38 @@ module Buildr
     module Scala
       include Extension
 
-      NATURE = 'ch.epfl.lamp.sdt.core.scalanature'
-      CLASSPATH_CONTAINER = 'ch.epfl.lamp.sdt.launching.SCALA_CONTAINER'
-      BUILDER = 'ch.epfl.lamp.sdt.core.scalabuilder'
+      NATURE    = 'ch.epfl.lamp.sdt.core.scalanature'
+      CONTAINER = 'ch.epfl.lamp.sdt.launching.SCALA_CONTAINER'
+      BUILDER   = 'ch.epfl.lamp.sdt.core.scalabuilder'
 
       after_define do |project|
-        if project.compile.language == :scala || project.test.compile.language == :scala
-          options = project.eclipse.options
-          if options.natures == []
-            options.natures = [NATURE, Buildr::Eclipse::Java::NATURE]
+        eclipse = project.eclipse
+
+        # smart defaults
+        if eclipse.natures.empty? && (project.compile.language == :scala || project.test.compile.language == :scala)
+          eclipse.natures = [NATURE, Buildr::Eclipse::Java::NATURE]
+          eclipse.classpath_containers = [CONTAINER, Buildr::Eclipse::Java::CONTAINER] if eclipse.classpath_containers.empty?
+          eclipse.builders = BUILDER if eclipse.builders.empty?
+        end
+
+        # :scala nature explicitly set
+        if eclipse.natures.include? :scala
+          unless eclipse.natures.include? NATURE
+            # scala nature must be before java nature
+            eclipse.natures += [Buildr::Eclipse::Java::NATURE] unless eclipse.natures.include? Buildr::Eclipse::Java::NATURE
+            index = eclipse.natures.index(Buildr::Eclipse::Java::NATURE) || -1
+            eclipse.natures = eclipse.natures.insert(index, NATURE)
           end
-          if options.classpath_containers == []
-            options.classpath_containers = 
-              [CLASSPATH_CONTAINER, Buildr::Eclipse::Java::CLASSPATH_CONTAINER]
+          unless eclipse.classpath_containers.include? CONTAINER
+            # scala container must be before java container
+            index = eclipse.classpath_containers.index(Buildr::Eclipse::Java::CONTAINER) || -1
+            eclipse.classpath_containers = eclipse.classpath_containers.insert(index, CONTAINER)
           end
-          options.builders.insert(0, BUILDER) unless options.builders.include? BUILDER 
+          unless eclipse.builders.include? BUILDER
+            # scala builder overrides java builder
+            eclipse.builders -= [Buildr::Eclipse::Java::BUILDER]
+            eclipse.builders += [BUILDER]
+          end
         end
       end
 
