@@ -14,6 +14,7 @@ p(title). !images/zbuildr.png!
   <li>"Testing":testing.html</li>
   <li>"Settings & Profiles":settings_profiles.html</li>
   <li>"Languages":languages.html</li>
+  <li>"Rake and Tasks":rake_tasks.html</li>
   <li>"More Stuff":more_stuff.html</li>
   <li>"Extending Buildr":extending.html</li>
   <li>"Contributing":contributing.html</li>
