@@ -1,0 +1,270 @@
+---
+layout: default
+title: Rake and Tasks
+---
+
+Ok, so you've written a few Buildfiles already and you want to understand exactly what's going on under the covers.  Or perhaps you'd like to customize your build and add a few things here and there...  
+
+This section explains the relationship and interworking between Rake and Buildr.  We'll show how tasks are defined and wired together, and build a mental model for working with project dependencies.  Along the way, you'll learn how to add practically any task to your project in such way that it fits correctly in the execution order of your build.   
+
+h3(#whatisrake). What is Rake?
+
+Rake is a dependency-based build tool similar to the standard Unix "Make":http://en.wikipedia.org/wiki/Make_(software) tool. However, instead of defining its own language and syntax, Rake is a Ruby library and provides an embedded domain-specific language for describing build tasks and wiring them together.
+
+Buildr was designed around Rake and relies on it for sequencing and executing build tasks.  Understanding how Rake works is important since it drives most of the execution of your build.  It's also crucial if you want to extend Buildr and make it do tricks even its original authors haven't envisioned. 
+
+To illustrate how build tasks are declared and wired in Rake, let's pretend we have a program composed of independent modules @A@ and @B@, and another module @C@ that integrates with both @A@ and @B@.
+
+<pre>
+   Your Program
+ +---------------+
+ | +---+   +---+ |
+ | | A |<--|   | |
+ | +---+   |   | |
+ |         | C | |
+ | +---+   |   | |
+ | | B |<--|   | |
+ | +---+   +---+ |
+ +---------------+
+</pre>
+
+In order to build this program, you would typically compile @A@ and @B@ separately, then compile @C@ using both @A@ and @B@ 's exported interfaces, and finally package all of them together to create a stand-alone application.   
+
+Let's represent these tasks as a dependency graph.
+
+<pre>
+compile A <--+
+             +--- compile C <-- package A,B,C
+compile B <--+
+</pre>
+
+(The arrows in the graph above means "depends on")
+
+Using Rake, you would define and wire these tasks as follows,
+
+{% highlight ruby %}
+task "compile A" do
+  p "compiling A ..."
+  # code to compile A
+end
+
+task "compile B" do
+  p "compiling B ..."
+  # code to compile B
+end
+
+task "compile C" => ["compile A", "compile B"] do
+  p "compiling C ..."
+  # code to compile C
+end
+
+task "package A,B,C" => ["compile A", "compile B", "compile C"] do
+  p "packaging A,B,C ..."
+  # code to package A, B and C
+end
+{% endhighlight %}
+
+As you can see, the @task@ function takes a name, an optional list of dependencies and a block of code as arguments.   If you were to paste this code in a file called @Rakefile@ and run @rake@, you would get:
+
+{% highlight sh %}
+$ rake "package A,B,C"
+(in /home/buildr/tutorial)
+compiling A ...
+compiling B ...
+compiling C ...
+packaging A,B,C ...
+{% endhighlight %}
+
+In the above command, we asked rake to package @A@, @B@ and @C@.  Rake read the task definitions, wired all dependencies and starting from the goal, it recursively executed task dependencies until all were run and the goal itself could be executed.
+
+That's the essence of Rake -- you give it one or more goals and it will determine the order of execution of tasks and ensure that necessary task dependencies are executed first, recursively.   It's also important to note that Rake will only execute tasks required to achieve the goal(s) specified on the command line, or the "default" task if no goals are specified.   Rake does not execute tasks unless they are needed.
+
+p(tip). If you have used Apache Ant or any of the Make variants, these notions of tasks and dependencies should be immediately familiar.   These tools follow a similar model, although most of them define their own language instead of leveraging an existing scripting language such as Ruby.  As we'll demonstrate, Ruby, Rake and Buildr form a much more expressive and potent framework for building your applications. 
+
+h3(#enterbuildr). Enter Buildr
+
+As it turns out, wiring tasks with Rake gets increasing tedious as the number of task increases.  Builds with dozens or even hundreds of tasks are not uncommon and the resulting Rakefiles can sometime look like spaghetti code due to the graph-oriented nature of dependencies.  As builds grow, it becomes more and more difficult to understand, maintain and debug them.
+
+This is where Buildr comes in.  Buildr facilitates the definition and wiring of tasks by using projects with a common set of tasks.  
+
+
+{% highlight ruby %}
+# This is Buildr code
+define "My application" do
+
+  define "A" do
+    package :jar
+  end
+  
+  define "B" do
+    package :jar
+  end
+
+  define "C" do
+    compile.with projects("A", "B")
+    package :jar
+  end
+  
+  package(:war).using :libs => projects("A", "B", "C")
+end
+{% endhighlight %}
+
+
+In Buildr, projects are defined as follows:
+
+{% highlight ruby %}
+desc "Some example project"
+define "example" do
+  # code to customize project here
+end
+{% endhighlight %}
+
+By default, each Buildr project has a number of pre-defined tasks such as "compile", "test", "build", "package", etc.  These tasks are wired as illustrated here:
+
+<pre>
+compile <--- test <--- build <--- package
+</pre>
+
+(Note that these are only a subset of pre-defined tasks.)  
+
+By using such convention, Buildr avoids some boilerplate code and enforces some structure to your project.  When you customize your projects, you are mostly attaching additional dependencies to pre-defined tasks.  For example, if you tell Buildr to package your project as a .jar file,
+
+{% highlight ruby %}
+define "example" do
+  package :jar
+end
+{% endhighlight %}
+
+then Buildr creates a new task and adds it as a dependency to the standard package task:
+
+<pre>
+
+                                +-- package(:jar) <--+
+                                |                    |
+compile <--- test <--- build <--+--------------------+--- package
+</pre>
+
+It's worth mentioning that the pre-defined tasks @compile@, @test@, @build@ and @package@ don't do anything.  They exist to provide a basic structure (in the form of initial dependency constraints) to your projects such that other tasks may be added easily before or after these default tasks.
+
+A typical project with compilation, unit testing and packaging tasks would therefore have a structure similar to,
+
+(figure with compile and test tasks added)
+
+
+h3. Hierarchical Projects
+
+
+Projects may also have sub-projects and 
+
+
+{% highlight ruby %}
+define "example" do
+  
+  define "A" do
+  end
+  
+  define "B" do
+  end
+end
+{% endhighlight %}
+
+
+<pre>
+
+                               +---- A:test <---+
+A:compile <--+-----------------+                |                   |
+             +-- example:compile <-- compile <--+-- example:test <-- test <-- 
+B:compile <--+                                  |
+                                      B:test <--+
+                                     
+</pre>
+
+
+{% highlight ruby %}
+# This is Buildr code
+define "My application" do
+
+  define "A" do
+    package :jar
+  end
+  
+  define "B" do
+    package :jar
+  end
+
+  define "C" do
+    compile.with projects("A", "B")
+    package :jar
+  end
+  
+  package(:war).using :libs => projects("A", "B", "C")
+end
+{% endhighlight %}
+
+
+
+Buildr uses Rake and its execution is driven in large part by Rake's  to determine the execution order of build tasks.
+
+
+
+
+Phases:
+
+1) Load and execute the buildfile
+2) Start Rake with the goals specified on the command-line.
+
+
+reactive programming.
+
+independent composition of tasks
+
+tasks added before, after or even concurrently if Rake is run in a concurrent fashion.
+
+
+<pre>
+A <-- B <-- C
+
+A <--+
+     |-- C
+B <--+
+</pre>
+
+Tasks are executed in reverse order of dependencies.
+
+
+Buildr's Standard Tasks
+
+
+<pre>
+compile -->  package -->  test --> integration  --> release
+</pre>
+
+
+Circular dependencies
+
+
+Enhancing a task
+
+Double-Enhancement
+
+
+
+topics
+
+
+-double enhance
+-execute before:  add dependency
+-execute after:  enhance
+
+Rake decides if a task executes but each task is individually responsible to determine if it should do something.
+
+
+{% highlight ruby %}
+task :unzip_birt => unzip(_("target/birt") => BIRT_WAR) do
+  compile.with Dir[_("target/birt/WEB-INF/lib") + "/*.jar"]
+end
+
+task :compile => :unzip_birt
+{% endhighlight %}
+
+
