@@ -17,14 +17,17 @@
 require File.join(File.dirname(__FILE__), '../spec_helpers')
 
 
-JAVA_CONTAINER  = Buildr::Eclipse::Java::CONTAINER
-SCALA_CONTAINER = Buildr::Eclipse::Scala::CONTAINER
+JAVA_CONTAINER   = Buildr::Eclipse::Java::CONTAINER
+SCALA_CONTAINER  = Buildr::Eclipse::Scala::CONTAINER
+PLUGIN_CONTAINER = Buildr::Eclipse::Plugin::CONTAINER
 
-JAVA_NATURE  = Buildr::Eclipse::Java::NATURE
-SCALA_NATURE = Buildr::Eclipse::Scala::NATURE
+JAVA_NATURE   = Buildr::Eclipse::Java::NATURE
+SCALA_NATURE  = Buildr::Eclipse::Scala::NATURE
+PLUGIN_NATURE = Buildr::Eclipse::Plugin::NATURE
 
-JAVA_BUILDER  = Buildr::Eclipse::Java::BUILDER
-SCALA_BUILDER = Buildr::Eclipse::Scala::BUILDER
+JAVA_BUILDER    = Buildr::Eclipse::Java::BUILDER
+SCALA_BUILDER   = Buildr::Eclipse::Scala::BUILDER
+PLUGIN_BUILDERS = Buildr::Eclipse::Plugin::BUILDERS
 
 
 module EclipseHelper
@@ -173,6 +176,29 @@ describe Buildr::Eclipse do
       it 'should have Scala build command and no Java build command' do
         build_commands.should include(SCALA_BUILDER)
         build_commands.should_not include(JAVA_BUILDER)
+      end
+    end
+
+    describe 'Plugin project' do
+
+      before do
+        write 'buildfile'
+        write 'src/main/java/Activator.java'
+        write 'plugin.xml'
+      end
+
+      it 'should have plugin nature before Java nature' do
+        define('foo')
+        project_natures.should include(PLUGIN_NATURE)
+        project_natures.should include(JAVA_NATURE)
+        project_natures.index(PLUGIN_NATURE).should < project_natures.index(JAVA_NATURE)
+      end
+
+      it 'should have plugin build commands and the Java build command' do
+        define('foo')
+        build_commands.should include(PLUGIN_BUILDERS[0])
+        build_commands.should include(PLUGIN_BUILDERS[1])
+        build_commands.should include(JAVA_BUILDER)
       end
     end
   end
