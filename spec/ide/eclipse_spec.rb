@@ -36,12 +36,12 @@ module EclipseHelper
     REXML::Document.new(File.open('.classpath')).root.elements
   end
 
-  def classpath_sources attribute='path'
+  def classpath_sources(attribute='path')
     classpath_xml_elements.collect("classpathentry[@kind='src']") { |n| n.attributes[attribute] }
   end
 
   # <classpathentry path="PATH" output="RETURNED_VALUE"/>
-  def classpath_specific_output path
+  def classpath_specific_output(path)
     specific_output = classpath_xml_elements.collect("classpathentry[@path='#{path}']") { |n| n.attributes['output'] }
     raise "expected: one output attribute for path '#{path}, got: #{specific_output.inspect}" if specific_output.length > 1
     specific_output[0]
@@ -55,7 +55,7 @@ module EclipseHelper
   end
 
   # <classpathentry path="PATH" sourcepath="RETURNED_VALUE" kind="var"/>
-  def sourcepath_for_path path
+  def sourcepath_for_path(path)
     classpath_xml_elements.collect("classpathentry[@kind='var',@path='#{path}']") do |n|
       n.attributes['sourcepath'] || 'no source artifact'
     end
@@ -74,7 +74,7 @@ module EclipseHelper
     project_xml_elements.collect("buildSpec/buildCommand/name") { |n| n.text }
   end
 
-  def classpath_containers attribute='path'
+  def classpath_containers(attribute='path')
     classpath_xml_elements.collect("classpathentry[@kind='con']") { |n| n.attributes[attribute] }
   end
 end

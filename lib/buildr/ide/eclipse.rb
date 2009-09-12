@@ -105,7 +105,7 @@ module Buildr
       end
 
       private
-        
+
       def arrayfy(obj)
         obj.is_a?(Array) ? obj : [obj]
       end
@@ -200,7 +200,7 @@ module Buildr
           end
         end
       end
-      
+
       # The only thing we need to look for is a change in the Buildfile.
       file(project.path_to('.project')=>Buildr.application.buildfile) do |task|
         if (project.eclipse.natures.reject { |x| x.is_a?(Symbol) }.size > 0)

@@ -21,7 +21,7 @@ module Buildr
   module Eclipse
     module Java
       include Extension
-      
+
       NATURE    = 'org.eclipse.jdt.core.javanature'
       CONTAINER = 'org.eclipse.jdt.launching.JRE_CONTAINER'
       BUILDER    = 'org.eclipse.jdt.core.javabuilder'
@@ -35,7 +35,7 @@ module Buildr
           eclipse.classpath_containers = CONTAINER if eclipse.classpath_containers.empty?
           eclipse.builders = BUILDER if eclipse.builders.empty?
         end
-        
+
         # :java nature explicitly set
         if eclipse.natures.include? :java
           eclipse.natures += NATURE unless eclipse.natures.include? NATURE
@@ -43,7 +43,7 @@ module Buildr
           eclipse.builders += BUILDER unless eclipse.builders.include? BUILDER
         end
       end
-      
+
     end
   end
 end
