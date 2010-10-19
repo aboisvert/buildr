@@ -17,7 +17,7 @@
 require File.expand_path(File.join(File.dirname(__FILE__), '..', 'spec_helpers'))
 
 
-describe 'ArchiveTask', :shared=>true do
+shared_examples_for 'ArchiveTask' do
   before do
     @dir = File.expand_path('test')
     @files = %w{Test1.txt Text2.html}.map { |file| File.expand_path(file, @dir) }.
@@ -358,7 +358,6 @@ describe 'ArchiveTask', :shared=>true do
     lambda { archive(@archive).with :option=>true }.should raise_error
   end
 end
-
 
 describe TarTask do
   it_should_behave_like 'ArchiveTask'
